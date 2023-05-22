@@ -1,7 +1,6 @@
 use regex::Regex;
 use once_cell::sync::OnceCell;
 use eyre::ContextCompat;
-use serde_json::Value;
 use serde::Deserialize;
 
 use fluvio_smartmodule::{
@@ -56,7 +55,7 @@ fn get_params(params: SmartModuleExtraParams) -> Result<Vec<Operation>> {
 }
 
 /// Traverse the regex list, compute regex, and collect output
-fn apply_regex_ops_to_json_record(record: &Record, ops: &Vec<Operation>) -> Result<Value> {
+fn apply_regex_ops_to_json_record(record: &Record, ops: &Vec<Operation>) -> Result<String> {
     let data_str: &str = std::str::from_utf8(record.value.as_ref())?;
     let mut data = data_str.to_string();
 
@@ -65,7 +64,7 @@ fn apply_regex_ops_to_json_record(record: &Record, ops: &Vec<Operation>) -> Resu
         data = op.run_regex(&data);
     }
 
-    Ok(serde_json::from_str(data.as_str())?)
+    Ok(data)
 }    
 
 #[smartmodule(map)]
@@ -74,7 +73,7 @@ pub fn map(record: &Record) -> Result<(Option<RecordData>, RecordData)> {
     let ops = OPS.get().wrap_err("regex operations not initialized")?;
 
     let result = apply_regex_ops_to_json_record(record, ops)?;
-    Ok((key, serde_json::to_string(&result)?.into()))
+    Ok((key, result.into()))
 }
 
 #[smartmodule(init)]
@@ -90,6 +89,8 @@ fn init(params: SmartModuleExtraParams) -> Result<()> {
 #[cfg(test)]
 mod tests {
     use super::*;
+    use serde_json::{Value, json};
+    
     static INPUT: &str = r#"{
         "description": "Independence High School",
         "class": "2025-A",
@@ -217,9 +218,10 @@ mod tests {
 
         let record = Record::new(INPUT);
         let result = apply_regex_ops_to_json_record(&record, &ops).unwrap();
+        let result_value: Value = serde_json::from_str(result.as_str()).unwrap();
 
-        let expected_value:Value = serde_json::from_str(EXPECTED).unwrap();
-        assert_eq!(result, expected_value);
+        let expected_value: Value = serde_json::from_str(EXPECTED).unwrap();
+        assert_eq!(result_value, expected_value);
     }
 
 }
