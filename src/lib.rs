@@ -21,7 +21,7 @@ enum Operation {
     Replace(Replace)
 }
 
-#[derive(Clone, Debug, Deserialize)]
+#[derive(Debug, Deserialize)]
 struct Replace {
     #[serde(with = "serde_regex")]
     regex: Regex,
