@@ -89,7 +89,7 @@ fn init(params: SmartModuleExtraParams) -> Result<()> {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use serde_json::{Value, json};
+    use serde_json::Value;
     
     static INPUT: &str = r#"{
         "description": "Independence High School",
