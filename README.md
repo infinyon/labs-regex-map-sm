@@ -4,7 +4,7 @@ SmartModule to read a record, run `replace-all` regex, and write the result back
 
 ### Input Record
 
-A JSON object:
+An arbitrary record (it does not need to be JSON):
 
 ```json
 {
@@ -57,7 +57,7 @@ transforms:
 
 ### Outpot Record
 
-A JSON object with a new `parsed` tree, and masked `ssn` value:
+A new record with the output of the transformations:
 
 ```json
 {
@@ -85,8 +85,6 @@ A JSON object with a new `parsed` tree, and masked `ssn` value:
   ]
 }
 ```
-
-Note, no result is generated if the `target` key cannot be found, or the `regex` capture operation returns no matches.
 
 
 ### Build binary
