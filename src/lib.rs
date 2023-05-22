@@ -1,8 +1,8 @@
 use regex::Regex;
 use once_cell::sync::OnceCell;
 use eyre::ContextCompat;
-use serde::Deserialize;
 use serde_json::Value;
+use serde::Deserialize;
 
 use fluvio_smartmodule::{
     smartmodule, Result, Record, RecordData,
@@ -23,36 +23,16 @@ enum Operation {
 
 #[derive(Clone, Debug, Deserialize)]
 struct Replace {
-    regex: String,
+    #[serde(with = "serde_regex")]
+    regex: Regex,
     with: String,
-
-    #[serde(skip)]
-    re: Option<Regex>,
 }
 
 impl Operation {
-    pub fn get_re(&self) -> &Option<Regex> {
-        match self {
-            Operation::Replace(r) => &r.re
-        }
-    }
-
-    pub fn clone_with_regex(&self) -> Result<Operation> {
-        let op = match self {
-            Operation::Replace(r) => {
-                let mut new = r.clone();
-                new.re = Some(Regex::new(&r.regex.as_str())?);
-                Operation::Replace(new)
-            }
-        };
-        Ok(op)
-    }
-
     pub fn run_regex(&self, text: &String) -> String {
         match self {
             Operation::Replace(r) => {
-                let regex = r.re.as_ref().unwrap();
-                regex.replace_all(text,  &r.with).to_string()
+                r.regex.replace_all(text,  &r.with).to_string()
             }
         }
     }
@@ -75,18 +55,6 @@ fn get_params(params: SmartModuleExtraParams) -> Result<Vec<Operation>> {
     }
 }
 
-/// Loop over operations and compile regex
-fn compile_regex(operations: Vec<Operation>) -> Result<Vec<Operation>> {
-    let mut result: Vec<Operation> = vec![];
-
-    let mut iter = operations.into_iter();
-    while let Some(op) = iter.next() {
-        result.push(op.clone_with_regex()?);
-    }
-
-    Ok(result)
-}
-
 /// Traverse the regex list, compute regex, and collect output
 fn apply_regex_ops_to_json_record(record: &Record, ops: &Vec<Operation>) -> Result<Value> {
     let data_str: &str = std::str::from_utf8(record.value.as_ref())?;
@@ -94,9 +62,7 @@ fn apply_regex_ops_to_json_record(record: &Record, ops: &Vec<Operation>) -> Resu
 
     let mut iter = ops.into_iter();
     while let Some(op) = iter.next() {
-        if op.get_re().is_some() {
-            data = op.run_regex(&data);
-        }
+        data = op.run_regex(&data);
     }
 
     Ok(serde_json::from_str(data.as_str())?)
@@ -115,8 +81,7 @@ pub fn map(record: &Record) -> Result<(Option<RecordData>, RecordData)> {
 fn init(params: SmartModuleExtraParams) -> Result<()> {
     let ops = get_params(params)?;
 
-    let regex_ops = compile_regex(ops)?;
-    OPS.set(regex_ops).expect("regex operations already initialized");
+    OPS.set(ops).expect("regex operations already initialized");
 
     Ok(())
 }
@@ -151,31 +116,13 @@ mod tests {
     }"#;
 
     #[test]
-    fn test_compile_regex() {
-        let params = vec![
-            Operation::Replace(Replace {
-                regex: r"\d{3}-\d{2}-\d{4}".to_owned(),
-                with: "***-**-****".to_owned(),
-                re: None
-            })
-        ];
-
-        let result = compile_regex(params);
-        assert!(result.is_ok());
-        for r in result.unwrap() {
-            assert!(r.get_re().is_some());
-        }
-    }
-
-    #[test]
     fn run_regex_test() {
         // Replace exact
         let input = r"123-45-6789".to_owned();
         let regex = r"\d{3}-\d{2}-\d{4}";
         let op = Operation::Replace(Replace {
-            regex: regex.to_owned(),
-            with: "***-**-****".to_owned(),
-            re: Some(Regex::new(regex).unwrap())
+            regex: Regex::new(regex).unwrap(),
+            with: "***-**-****".to_owned()
         });
         let expected = "***-**-****".to_owned();
 
@@ -186,9 +133,8 @@ mod tests {
         let input = r"Alice Jackson, ssn 123-45-6789, location: NY".to_owned();
         let regex = r"\d{3}-\d{2}-\d{4}";
         let op = Operation::Replace(Replace {
-            regex: regex.to_owned(),
-            with: "***-**-****".to_owned(),
-            re: Some(Regex::new(regex).unwrap())
+            regex: Regex::new(regex).unwrap(),
+            with: "***-**-****".to_owned()
         });
         let expected = "Alice Jackson, ssn ***-**-****, location: NY".to_owned();
 
@@ -199,9 +145,8 @@ mod tests {
         let input = r"Alice, ssn 123-45-6789, Jack, ssn 987-65-4321".to_owned();
         let regex = r"\d{3}-\d{2}-\d{4}";
         let op = Operation::Replace(Replace {
-            regex: regex.to_owned(),
-            with: "***-**-****".to_owned(),
-            re: Some(Regex::new(regex).unwrap())
+            regex: Regex::new(regex).unwrap(),
+            with: "***-**-****".to_owned()
         });
         let expected = "Alice, ssn ***-**-****, Jack, ssn ***-**-****".to_owned();
 
@@ -212,9 +157,8 @@ mod tests {
         let input = r#""address": "285 LA PALA DR APT 2343, SAN JOSE CA 95127""#.to_owned();
         let regex = r#"(?P<first>"address":\s+\")([\w\d\s]+),"#;
         let op = Operation::Replace(Replace {
-            regex: regex.to_owned(),
-            with: "${first}...".to_owned(),
-            re: Some(Regex::new(regex).unwrap())
+            regex: Regex::new(regex).unwrap(),
+            with: "${first}...".to_owned()
         });
         let expected = r#""address": "... SAN JOSE CA 95127""#.to_owned();
 
@@ -225,9 +169,8 @@ mod tests {
         let input = r"not a match".to_owned();
         let regex = r"\d{3}-\d{2}-\d{4}";
         let op = Operation::Replace(Replace {
-            regex: regex.to_owned(),
-            with: "***-**-****".to_owned(),
-            re: Some(Regex::new(regex).unwrap())
+            regex: Regex::new(regex).unwrap(),
+            with: "***-**-****".to_owned()
         });
         let expected = r"not a match".to_owned();
 
@@ -261,21 +204,18 @@ mod tests {
               }
             ]
         }"#;
-        let spec = vec![
+        let ops = vec![
             Operation::Replace(Replace {
-                regex: r"\d{3}-\d{2}-\d{4}".to_owned(),
-                with: "***-**-****".to_owned(),
-                re: None
+                regex: Regex::new(r"\d{3}-\d{2}-\d{4}").unwrap(),
+                with: "***-**-****".to_owned()
             }),
             Operation::Replace(Replace {
-                regex:  r#"(?P<first>"address":\s+\")([\w\d\s]+),"#.to_owned(),
-                with: "${first}...".to_owned(),
-                re: None
+                regex: Regex::new(r#"(?P<first>"address":\s+\")([\w\d\s]+),"#).unwrap(),
+                with: "${first}...".to_owned()
             })
         ];
 
         let record = Record::new(INPUT);
-        let ops = compile_regex(spec).unwrap();
         let result = apply_regex_ops_to_json_record(&record, &ops).unwrap();
 
         let expected_value:Value = serde_json::from_str(EXPECTED).unwrap();
