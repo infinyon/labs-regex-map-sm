@@ -1,5 +1,5 @@
 [package]
-name = "regex-map-json"
+name = "regex-map"
 version = "0.1.0"
 authors = ["Fluvio Contributors <team@fluvio.io>"]
 description = "Regex arbitrary transformations SmartModule"
