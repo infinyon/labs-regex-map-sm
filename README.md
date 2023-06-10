@@ -117,7 +117,7 @@ Test using `transform.yaml` file:
 smdk test --file ./test-data/input.json --raw  --transforms-file ./test-data/transform.yaml
 ```
 
-Note: pipe to `| tail -n+2 |jq` for pretty formatting
+Note: pipe to `| jq` for pretty formatting
 
 
 ### Cargo Compatible
