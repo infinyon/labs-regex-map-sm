@@ -44,7 +44,7 @@ In this example, we'll use the following transformation spec:
 
 ```yaml
 transforms:
-  - uses: <group>/regex-map@0.1.0
+  - uses: infinyon-labs/regex-map@0.1.1
     with:
       spec:
         - replace:

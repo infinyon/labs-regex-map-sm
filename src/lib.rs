@@ -4,7 +4,7 @@ use eyre::ContextCompat;
 use serde::Deserialize;
 
 use fluvio_smartmodule::{
-    smartmodule, Result, Record, RecordData,
+    smartmodule, Result, SmartModuleRecord, RecordData,
     dataplane::smartmodule::{
         SmartModuleExtraParams, SmartModuleInitError
     },
@@ -55,7 +55,7 @@ fn get_params(params: SmartModuleExtraParams) -> Result<Vec<Operation>> {
 }
 
 /// Traverse the regex list, compute regex, and collect output
-fn apply_regex_ops_to_json_record(record: &Record, ops: &Vec<Operation>) -> Result<String> {
+fn apply_regex_ops_to_json_record(record: &SmartModuleRecord, ops: &Vec<Operation>) -> Result<String> {
     let data_str: &str = std::str::from_utf8(record.value.as_ref())?;
     let mut data = data_str.to_string();
 
@@ -68,7 +68,7 @@ fn apply_regex_ops_to_json_record(record: &Record, ops: &Vec<Operation>) -> Resu
 }    
 
 #[smartmodule(map)]
-pub fn map(record: &Record) -> Result<(Option<RecordData>, RecordData)> {
+pub fn map(record: &SmartModuleRecord) -> Result<(Option<RecordData>, RecordData)> {
     let key = record.key.clone();
     let ops = OPS.get().wrap_err("regex operations not initialized")?;
 
@@ -90,6 +90,7 @@ fn init(params: SmartModuleExtraParams) -> Result<()> {
 mod tests {
     use super::*;
     use serde_json::Value;
+    use fluvio_smartmodule::Record;
     
     static INPUT: &str = r#"{
         "description": "Independence High School",
@@ -216,7 +217,7 @@ mod tests {
             })
         ];
 
-        let record = Record::new(INPUT);
+        let record = SmartModuleRecord::new(Record::new(INPUT), 0, 0);
         let result = apply_regex_ops_to_json_record(&record, &ops).unwrap();
         let result_value: Value = serde_json::from_str(result.as_str()).unwrap();
 
